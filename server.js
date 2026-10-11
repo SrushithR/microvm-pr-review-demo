@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 
 const APP_PORT = Number(process.env.APP_PORT || 8080);
 const HOOK_PORT = Number(process.env.HOOK_PORT || 9000);
 const HOOK_PREFIX = "/aws/lambda-microvms/runtime/v1";
+const markedModule = readFileSync(new URL("./node_modules/marked/lib/marked.esm.js", import.meta.url));
+const purifyModule = readFileSync(new URL("./node_modules/dompurify/dist/purify.es.mjs", import.meta.url));
 
 export const state = { sessionId: null, lifecycle: "IMAGE_READY" };
 
@@ -33,7 +36,7 @@ export const page = `<!doctype html>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Event description editor</title>
+    <title>Markdown event description editor</title>
     <style>
       :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #172033; background: #f5f7fb; }
       * { box-sizing: border-box; }
@@ -46,10 +49,12 @@ export const page = `<!doctype html>
       section { padding: 1.6rem; }
       section + section { border-left: 1px solid #e7eaf0; background: #fbfcfe; }
       .label { display: flex; align-items: center; justify-content: space-between; margin-bottom: .85rem; font-weight: 700; }
-      .badge { padding: .3rem .6rem; border-radius: 999px; color: #067647; background: #ecfdf3; font-size: .75rem; font-weight: 700; }
-      textarea { width: 100%; min-height: 21rem; resize: vertical; padding: 1rem; border: 1px solid #cfd5df; border-radius: .7rem; color: #172033; background: white; font: inherit; line-height: 1.65; outline: none; }
+      .badge { padding: .3rem .6rem; border-radius: 999px; color: #175cd3; background: #eff8ff; font-size: .75rem; font-weight: 700; }
+      textarea { width: 100%; min-height: 21rem; resize: vertical; padding: 1rem; border: 1px solid #cfd5df; border-radius: .7rem; color: #172033; background: white; font: 0.95rem/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; outline: none; }
       textarea:focus { border-color: #7f56d9; box-shadow: 0 0 0 3px rgba(127, 86, 217, .14); }
-      #preview { min-height: 21rem; margin: 0; padding: 1rem; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid #e7eaf0; border-radius: .7rem; background: white; line-height: 1.65; }
+      #preview { min-height: 21rem; padding: 1rem; border: 1px solid #e7eaf0; border-radius: .7rem; background: white; line-height: 1.65; overflow-wrap: anywhere; }
+      #preview > :first-child { margin-top: 0; }
+      #preview a { color: #6941c6; }
       footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1rem; color: #667085; font-size: .85rem; }
       footer span:last-child { overflow-wrap: anywhere; text-align: right; }
       @media (max-width: 760px) {
@@ -65,31 +70,37 @@ export const page = `<!doctype html>
     <main>
       <header>
         <h1>Event description</h1>
-        <p>Write the event details and review exactly what attendees will see.</p>
+        <p>Write in Markdown and preview the formatted event details.</p>
       </header>
       <div class="workspace">
         <section>
-          <div class="label"><label for="description">Description</label><span id="count">0 characters</span></div>
-          <textarea id="description" spellcheck="true">AWS Community Day Mumbai brings builders together to learn, share, and connect.
+          <div class="label"><label for="description">Markdown</label><span id="count">0 characters</span></div>
+          <textarea id="description" spellcheck="true"># AWS Community Day Mumbai
 
-Join us for a practical session on isolated, on-demand preview environments.</textarea>
+Learn about **Lambda MicroVMs** and isolated preview environments.
+
+- Fast startup
+- Dedicated isolation
+- Suspend and resume</textarea>
         </section>
         <section>
-          <div class="label"><span>Live preview</span><span class="badge" id="security-status">Plain text · HTML escaped</span></div>
-          <p id="preview" aria-live="polite"></p>
+          <div class="label"><span>Live preview</span><span class="badge" id="security-status">Markdown enabled</span></div>
+          <div id="preview" aria-live="polite"></div>
         </section>
       </div>
       <footer>
-        <span>Preview served from an AWS Lambda MicroVM in Singapore</span>
+        <span>Contributor preview · AWS Lambda MicroVM in Singapore</span>
         <span id="session">Loading session…</span>
       </footer>
     </main>
-    <script>
+    <script type="module">
+      import { marked } from '/marked.js';
+      import DOMPurify from '/purify.js';
       const description = document.querySelector('#description');
       const preview = document.querySelector('#preview');
       const count = document.querySelector('#count');
       function render() {
-        preview.textContent = description.value;
+        preview.innerHTML = DOMPurify.sanitize(marked.parse(description.value));
         count.textContent = description.value.length + ' characters';
       }
       description.addEventListener('input', render);
@@ -107,6 +118,16 @@ export function createAppServer() {
     if (request.method === "GET" && request.url === "/") {
       response.writeHead(200, { "cache-control": "no-store", "content-type": "text/html; charset=utf-8" });
       response.end(page);
+      return;
+    }
+    if (request.method === "GET" && request.url === "/marked.js") {
+      response.writeHead(200, { "cache-control": "public, max-age=3600", "content-type": "text/javascript; charset=utf-8" });
+      response.end(markedModule);
+      return;
+    }
+    if (request.method === "GET" && request.url === "/purify.js") {
+      response.writeHead(200, { "cache-control": "public, max-age=3600", "content-type": "text/javascript; charset=utf-8" });
+      response.end(purifyModule);
       return;
     }
     if (request.method === "GET" && request.url === "/api/state") return json(response, 200, state);
