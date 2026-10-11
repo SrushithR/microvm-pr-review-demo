@@ -13,10 +13,10 @@ function listen(server) {
 }
 after(async () => Promise.all(servers.map(server => new Promise(resolve => server.close(resolve)))));
 
-test("contributor renderer formats Markdown but preserves unsafe HTML", () => {
+test("contributor renderer formats Markdown and sanitizes its HTML", () => {
   assert.match(marked.parse("# Title\n\n**bold**"), /<h1>Title<\/h1>[\s\S]*<strong>bold<\/strong>/);
-  assert.match(marked.parse('<img src=x onerror="window.__xss=true">'), /onerror="window.__xss=true"/);
-  assert.match(page, /preview\.innerHTML = marked\.parse/);
+  assert.match(page, /DOMPurify\.sanitize\(marked\.parse/);
+  assert.match(page, /import DOMPurify from '\/purify\.js'/);
 });
 
 test("serves the contributor editor and lifecycle identity", async () => {
@@ -29,8 +29,10 @@ test("serves the contributor editor and lifecycle identity", async () => {
 
   const html = await fetch(`http://127.0.0.1:${app.address().port}`).then(response => response.text());
   const module = await fetch(`http://127.0.0.1:${app.address().port}/marked.js`);
+  const sanitizer = await fetch(`http://127.0.0.1:${app.address().port}/purify.js`);
   const state = await fetch(`http://127.0.0.1:${app.address().port}/api/state`).then(response => response.json());
   assert.match(html, /Markdown enabled/);
   assert.match(module.headers.get("content-type"), /text\/javascript/);
+  assert.match(sanitizer.headers.get("content-type"), /text\/javascript/);
   assert.deepEqual(state, { sessionId: "mvm-phase-5", lifecycle: "RUNNING" });
 });

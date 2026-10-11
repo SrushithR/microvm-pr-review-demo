@@ -6,6 +6,7 @@ const APP_PORT = Number(process.env.APP_PORT || 8080);
 const HOOK_PORT = Number(process.env.HOOK_PORT || 9000);
 const HOOK_PREFIX = "/aws/lambda-microvms/runtime/v1";
 const markedModule = readFileSync(new URL("./node_modules/marked/lib/marked.esm.js", import.meta.url));
+const purifyModule = readFileSync(new URL("./node_modules/dompurify/dist/purify.es.mjs", import.meta.url));
 
 export const state = { sessionId: null, lifecycle: "IMAGE_READY" };
 
@@ -94,11 +95,12 @@ Learn about **Lambda MicroVMs** and isolated preview environments.
     </main>
     <script type="module">
       import { marked } from '/marked.js';
+      import DOMPurify from '/purify.js';
       const description = document.querySelector('#description');
       const preview = document.querySelector('#preview');
       const count = document.querySelector('#count');
       function render() {
-        preview.innerHTML = marked.parse(description.value);
+        preview.innerHTML = DOMPurify.sanitize(marked.parse(description.value));
         count.textContent = description.value.length + ' characters';
       }
       description.addEventListener('input', render);
@@ -121,6 +123,11 @@ export function createAppServer() {
     if (request.method === "GET" && request.url === "/marked.js") {
       response.writeHead(200, { "cache-control": "public, max-age=3600", "content-type": "text/javascript; charset=utf-8" });
       response.end(markedModule);
+      return;
+    }
+    if (request.method === "GET" && request.url === "/purify.js") {
+      response.writeHead(200, { "cache-control": "public, max-age=3600", "content-type": "text/javascript; charset=utf-8" });
+      response.end(purifyModule);
       return;
     }
     if (request.method === "GET" && request.url === "/api/state") return json(response, 200, state);
