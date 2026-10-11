@@ -4,6 +4,8 @@ A deliberately small frontend used to demonstrate isolated pull-request reviews 
 
 The `main` branch is the safe baseline: event descriptions are rendered as plain text. The demonstration pull request adds Markdown rendering and intentionally introduces an XSS defect so the review system has a real regression to find.
 
+Every pull-request update starts a dedicated preview and automated review through the GitHub webhook.
+
 > **Security demonstration:** feature branches and pull requests may intentionally contain vulnerable code. Do not deploy this repository as a production application.
 
 ## Run locally
