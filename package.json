@@ -10,7 +10,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "dompurify": "^3.4.16",
     "marked": "^17.0.3"
   }
 }
